@@ -1,0 +1,34 @@
+{
+  "name": "sync-session",
+  "version": "1.0.0",
+  "description": "it can cross tab window to shared sessionStorage easily.",
+  "main": "dist/umd/sync-session.min.js",
+  "module": "dist/es/index.js",
+  "scripts": {
+    "build": "rollup -c",
+    "tsc": "tsc"
+  },
+  "files": [
+    "readme",
+    "dist"
+  ],
+  "types": "dist/types/index.d.ts",
+  "typings": "dist/types/index.d.ts",
+  "unpkg": "dist/umd/sync-session.min.js",
+  "keywords": [
+    "sync session storage",
+    "session storage",
+    "cross",
+    "shared session storage"
+  ],
+  "author": "hans000",
+  "license": "MIT",
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^5.21.0",
+    "@typescript-eslint/parser": "^5.21.0",
+    "rollup": "^2.70.2",
+    "rollup-plugin-terser": "^7.0.2",
+    "rollup-plugin-typescript2": "^0.31.2",
+    "typescript": "^4.6.3"
+  }
+}
