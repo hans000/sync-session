@@ -2,10 +2,12 @@ function createPlainObject() {
     return Object.create(null)
 }
 
+type SessionObject = Record<string, string>
+
 function update(keys: string[], msg: string) {
     const data = JSON.parse(msg)
-    const addObject: Record<string, string> = createPlainObject()
-    const removeObject: Record<string, string> = createPlainObject()
+    const addObject: SessionObject = createPlainObject()
+    const removeObject: SessionObject = createPlainObject()
     keys.forEach(key => {
         if (key in data) {
             addObject[key] = data[key]
@@ -32,7 +34,7 @@ function genId() {
     return Date.now() as unknown as string
 }
 
-type SubscribeHandle = (addObject: Record<string, string>, removeObject: Record<string, string>) => void
+type SubscribeHandle = (addObject: SessionObject, removeObject: SessionObject) => void
 
 
 interface SyncSession {
@@ -60,7 +62,7 @@ class SyncSession {
 
         // opened window, payload
         if (event.key === getKey && !this.pushed && event.newValue !== null) {
-            const result: Record<string, string> = createPlainObject()
+            const result: SessionObject = createPlainObject()
             this.config.keys.forEach(key => {
                 if (key in sessionStorage) {
                     result[key] = sessionStorage.getItem(key)!
@@ -97,7 +99,7 @@ class SyncSession {
         window.addEventListener('storage', this.handle)
     }
 
-    public pull() {
+    public pull(): Promise<{ addObject: SessionObject, removeObject: SessionObject}> {
         const id = this.config.id
         const getKey = genKey(GetKey, id)
         const setKey = genKey(SetKey, id)

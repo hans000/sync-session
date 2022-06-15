@@ -1,12 +1,11 @@
 {
   "name": "sync-session",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "it can cross tab window to shared sessionStorage easily.",
   "main": "dist/umd/sync-session.min.js",
   "module": "dist/es/index.js",
   "scripts": {
-    "build": "rollup -c",
-    "tsc": "tsc"
+    "build": "tsc && rollup -c"
   },
   "files": [
     "readme",
