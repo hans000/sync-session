@@ -1,94 +1,21 @@
 import { defineConfig } from 'rollup'
 import typescript from 'rollup-plugin-typescript2'
 import { terser } from 'rollup-plugin-terser'
-import pkg from './package.json'
 
-function createESMConfig(input, output, production) {
-  return defineConfig({
-    input,
-    output: { file: output, format: 'esm' },
-    plugins: [
-      typescript({
-        tsconfig: 'tsconfig.json',
-        useTsconfigDeclarationDir: true,
-      }),
-      production
-        ? terser({
-            compress: {
-              pure_getters: true,
-              unsafe: true,
-              unsafe_comps: true,
-              warnings: false,
-            },
-            format: {
-              comments: RegExp(`${pkg.name}`),
-            },
-          })
-        : [],
-    ],
-  })
-}
-
-function createUMDConfig(input, output, production) {
-  return defineConfig({
-    input,
-    output: { file: output, format: 'umd', name: 'SyncSession' },
-    plugins: [
-      typescript({
-        tsconfig: 'tsconfig.json',
-        useTsconfigDeclarationDir: true,
-      }),
-      production
-        ? terser({
-            compress: {
-              pure_getters: true,
-              unsafe: true,
-              unsafe_comps: true,
-              warnings: false,
-            },
-            format: {
-              comments: RegExp(`${pkg.name}`),
-            },
-          })
-        : [],
-    ],
-  })
-}
-
-function createIifeConfig(input, output, production) {
-  return defineConfig({
-    input,
-    output: { file: output, format: 'iife', name: 'SyncSession' },
-    plugins: [
-      typescript({
-        tsconfig: 'tsconfig.json',
-        useTsconfigDeclarationDir: true,
-      }),
-      production
-        ? terser({
-            compress: {
-              pure_getters: true,
-              unsafe: true,
-              unsafe_comps: true,
-              warnings: false,
-            },
-            format: {
-              comments: RegExp(`${pkg.name}`),
-            },
-          })
-        : [],
-    ],
-  })
-}
-
-export default function () {
-  const input = 'src/index.ts'
-  return [
-    createESMConfig(input, 'dist/es/index.js', false),
-    createESMConfig(input, 'dist/es/index.min.js', true),
-    createUMDConfig(input, 'dist/umd/sync-session.js', false),
-    createUMDConfig(input, 'dist/umd/sync-session.min.js', true),
-    createIifeConfig(input, 'dist/iife/sync-session.js', false),
-    createIifeConfig(input, 'dist/iife/sync-session.min.js', true),
+export default defineConfig({
+  input: './src/index.ts',
+  output: [
+    { file: 'dist/es/index.js', format: 'es', },
+    { file: 'dist/es/index.min.js', format: 'es', plugins: [terser({})], },
+    { file: 'dist/umd/index.js', format: 'umd', name: 'SyncSession' },
+    { file: 'dist/umd/index.min.js', format: 'umd', plugins: [terser()], name: 'SyncSession' },
+    { file: 'dist/iife/index.js', format: 'iife', name: 'SyncSession' },
+    { file: 'dist/iife/index.min.js', format: 'iife', plugins: [terser()], name: 'SyncSession' },
+  ],
+  plugins: [
+    typescript({
+      tsconfig: 'tsconfig.json',
+      useTsconfigDeclarationDir: true,
+    }),
   ]
-}
+})

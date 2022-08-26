@@ -1,202 +1,162 @@
-function createPlainObject() {
-    return Object.create(null)
+import { GetKey, SetKey, PushKey, PushedKey } from "./constants"
+import { SessionData, SubscribeHandle } from "./types"
+import { genKey, genId, removeEvent, createPlainObject, update, addEvent, setLocalStorage, removeLocalStorage, expectParam } from "./utils"
+
+const __map__ = createPlainObject()
+
+export function get(id: string) {
+    return __map__[id]
 }
 
-type SessionObject = Record<string, string>
+export function create(id: string, syncKeys: string[]) {
+    // check input valid
+    if (typeof id !== 'string') expectParam('id', id)
+    if (! Array.isArray(syncKeys)) expectParam('keys', syncKeys)
 
-function update(keys: string[], msg: string) {
-    const data = JSON.parse(msg)
-    const addObject: SessionObject = createPlainObject()
-    const removeObject: SessionObject = createPlainObject()
-    keys.forEach(key => {
-        if (key in data) {
-            addObject[key] = data[key]
-            sessionStorage.setItem(key, data[key])
-        } else {
-            removeObject[key] = sessionStorage.getItem(key)!
-            sessionStorage.removeItem(key)
-        }
-    })
-    return { addObject, removeObject }
-}
+    // check exist
+    if (id in __map__) throw 'id `' + id + '` has been existed'
 
-const Prefix = '__ss_'
-const GetKey = 'get'
-const SetKey = 'set'
-const PushKey = 'push'
-const PushedKey = 'pushed'
-
-function genKey(type: string, id: string) {
-    return Prefix + type + '_' + id + '__'
-}
-
-function genId() {
-    return Date.now() as unknown as string
-}
-
-type SubscribeHandle = (addObject: SessionObject, removeObject: SessionObject) => void
-
-
-interface SyncSession {
-    create(id: string, keys?: string[]): this
-}
-
-class SyncSession {
-    private readonly subscriptions: SubscribeHandle[] = []
-    private pushed = false
-    private readonly pullStack: Function[] = []
-    private readonly pushStack: Function[] = []
-    private handle = (event: any) => {
-        const id = this.config.id
-        const getKey = genKey(GetKey, id)
-        const setKey = genKey(SetKey, id)
-        const pushKey = genKey(PushKey, id)
-        const pushedKey = genKey(PushedKey, id)
+    let pushed = false
+    let locked = false
+    const pushStack: Function[] = []
+    const pullStack: Function[] = []
+    const subscriptions: SubscribeHandle[] = []
+    
+    const getKey = genKey(GetKey, id)
+    const setKey = genKey(SetKey, id)
+    const pushKey = genKey(PushKey, id)
+    const pushedKey = genKey(PushedKey, id)
+    
+    function handle(event: StorageEvent) {
 
         // push
         if (event.key === pushKey) {
-            this.pushed = true
-            localStorage.setItem(getKey, genId())
+            pushed = true
+
+            setLocalStorage(getKey, genId())
             return
         }
 
         // opened window, payload
-        if (event.key === getKey && !this.pushed && event.newValue !== null) {
-            const result: SessionObject = createPlainObject()
-            this.config.keys.forEach(key => {
+        if (event.key === getKey && !pushed && event.newValue !== null) {
+            const result: SessionData = createPlainObject()
+            syncKeys.forEach(key => {
                 if (key in sessionStorage) {
                     result[key] = sessionStorage.getItem(key)!
                 }
             })
-            localStorage.setItem(setKey, JSON.stringify(result))
-            localStorage.removeItem(getKey)
-            localStorage.removeItem(setKey)
+            setLocalStorage(setKey, JSON.stringify(result))
+            removeLocalStorage(getKey)
+            removeLocalStorage(setKey)
             return
         }
 
         // new open window, pull data
         if (event.key === setKey) {
-            if (event.newValue && this.pushed) {
-                const { addObject, removeObject } = update(this.config.keys, event.newValue)
-                localStorage.setItem(pushedKey, genId())
-                localStorage.removeItem(pushedKey)
-                this.subscriptions.forEach(subscribe => subscribe(addObject, removeObject))
-                this.pushed = false
+            if (event.newValue && pushed) {
+                const [addData, removeData] = update(syncKeys, event.newValue)
+                setLocalStorage(pushedKey, genId())
+                removeLocalStorage(pushedKey)
+                subscriptions.forEach(subscribe => subscribe(addData, removeData))
+                pushed = false
             }
             return
         }
     }
-
-    public readonly config = {
-        id: genId(),
-        keys: Object.keys(sessionStorage),
-    }
-
-    constructor(id?: string, keys?: string[]) {
-        if (id) this.config.id = id
-        if (keys && keys.length) this.config.keys = keys
-
-        window.addEventListener('storage', this.handle)
-    }
-
-    public pull(): Promise<{ addObject: SessionObject, removeObject: SessionObject}> {
-        const id = this.config.id
+    
+    function pull(): Promise<[SessionData, SessionData]> {
         const getKey = genKey(GetKey, id)
         const setKey = genKey(SetKey, id)
-
+    
         try {
-            localStorage.setItem(getKey, genId())
+            setLocalStorage(getKey, genId())
         } catch (error) {
             return Promise.reject(error)
         }
-
-        if (this.pullStack.length) {
-            this.pullStack.forEach((handle: any) => {
-                window.removeEventListener('storage', handle)
-            })
-        }
-
+    
+        pullStack.forEach(removeEvent)
+    
         return new Promise((resolve) => {
             const handle = (event: any) => {
-                if (event.key === setKey && !this.pushed && event.newValue) {
-                    const { addObject, removeObject } = update(this.config.keys, event.newValue)
-
+                if (!locked && event.key === setKey && !pushed && event.newValue) {
+                    const [addData, removeData] = update(syncKeys, event.newValue)
+    
                     // trigger subscribe
-                    this.subscriptions.forEach(subscribe => subscribe(addObject, removeObject))
-
+                    subscriptions.forEach(subscribe => subscribe(addData, removeData))
+    
                     // remove stack handle
-                    const index = this.pushStack.findIndex(item => item === handle)
-                    this.pushStack.splice(index, 1)
-
+                    const index = pushStack.findIndex(item => item === handle)
+                    pushStack.splice(index, 1)
+    
                     // remove event
-                    window.removeEventListener('storage', handle)
-                    resolve({ addObject, removeObject })
+                    removeEvent(handle)
+                    resolve([addData, removeData])
                 }
             }
-
-            this.pullStack.push(handle)
-            window.addEventListener('storage', handle)
+    
+            pullStack.push(handle)
+            addEvent(handle)
         })
     }
-
-    public push() {
-        const id = this.config.id
-        const publishKey = genKey(PushKey, id)
-        const publishedKey = genKey(PushedKey, id)
-
+    
+    function push() {
+        // clear pull stack and locked
+        pullStack.forEach(removeEvent)
+        pullStack.length = 0
+        locked = true
+    
         try {
-            localStorage.setItem(publishKey, genId())
-            localStorage.removeItem(publishKey)
+            setLocalStorage(pushKey, genId())
+            removeLocalStorage(pushKey)
         } catch (error) {
             return Promise.reject(error)
         }
-
-        if (this.pushStack.length) {
-            this.pushStack.forEach((handle: any) => {
-                window.removeEventListener('storage', handle)
-            })
-        }
-
+    
+        pushStack.forEach(removeEvent)
+    
         return new Promise((resolve) => {
             const handle = (event: any) => {
-                if (event.key === publishedKey) {
+                if (event.key === pushedKey) {
                     // remove stack handle
-                    const index = this.pushStack.findIndex(item => item === handle)
-                    this.pushStack.splice(index, 1)
+                    const index = pushStack.findIndex(item => item === handle)
+                    pushStack.splice(index, 1)
                     // remove event
-                    window.removeEventListener('storage', handle)
+                    removeEvent(handle)
+                    // reset locked
+                    locked = false
                     resolve(undefined)
                 }
             }
-
-            this.pushStack.push(handle)
-            window.addEventListener('storage', handle)
+    
+            pushStack.push(handle)
+            addEvent(handle)
         })
     }
-
-    public subscribe(callback: SubscribeHandle) {
-        this.subscriptions.push(callback)
+    
+    function subscribe(callback: SubscribeHandle) {
+        subscriptions.push(callback)
+    }
+    
+    function unsubscribe(callback: SubscribeHandle) {
+        const index = subscriptions.findIndex(item => item === callback);
+        subscriptions.splice(index, 1);
+    }
+    
+    function dispose() {
+        pushStack.forEach(removeEvent)
+        pullStack.forEach(removeEvent)
+        subscriptions.length = 0
+        pullStack.length = 0
+        pushStack.length = 0
+        removeEvent(handle)
     }
 
-    public unsubscribe() {
-        this.subscriptions.length = 0
-    }
+    // init
+    addEvent(handle)
+    const instance = { pull, push, subscribe, unsubscribe, dispose }
 
-    public dispose() {
-        this.unsubscribe()
-        window.removeEventListener('storage', this.handle)
-    }
-}
+    // cache instance
+    __map__[id] = instance
 
-function createInstance(id?: string, keys?: string[]) {
-    const instance = new SyncSession(id, keys)
-    instance.create = function (id: string, keys?: string[]) {
-        return createInstance(id, keys)
-    }
     return instance
 }
-
-const instance = createInstance()
-instance.config.id = 'default'
-
-export default instance

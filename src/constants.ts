@@ -1,0 +1,5 @@
+export const Prefix = '__ss_'
+export const GetKey = 'get'
+export const SetKey = 'set'
+export const PushKey = 'push'
+export const PushedKey = 'pushed'

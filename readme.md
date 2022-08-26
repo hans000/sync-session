@@ -6,13 +6,15 @@ it can cross tab window to shared sessionStorage easily.
 
 ## Usage
 
+English | [中文](./readme-zh.md)
+
 ### install
 ```
 // npm
 npm i sync-session -S
 
 // esm
-import SyncSession from 'sync-session'
+import * as SyncSession from 'sync-session'
 
 // script
 <script src="//unkpg.com/sync-session"></script>
@@ -21,42 +23,49 @@ import SyncSession from 'sync-session'
 ### example
 
 ```
-SyncSession.config.id = 'foo'
-SyncSession.config.keys = ['foo', 'bar']
+import { create, get } from 'sync-session'
 
-SyncSession.pull().then(({ addObject, removeObject }) => {
+const ss = create('test', ['foo', 'bar'])
+
+ss.pull().then(([ addObject, removeObject ]) => {
     console.log(addObject, removeObject)
 })
 
-SyncSession.push().then()
+ss.push().then()
 
-SyncSession.subscribe(({ addObject, removeObject }) => {
+ss.subscribe(([ addObject, removeObject ]) => {
     console.log(addObject, removeObject)
 })
 
-SyncSession.unsubscribe()
+ss.unsubscribe()
 
-SyncSession.dispose()
+ss.dispose()
 
+const ss2 = get('test')
 
-```
+// ss === ss2
 
-### create an instance
-SyncSession is an default instance, you can also create an new istance if you need by `create` method.
-```
-const newInstance = SyncSession.create('new-instance', ['foo', 'bar'])
 ```
 
 ## API
 
-- config
-- pull
-- push
-- subscribe
-- unsubscribe
-- dispose
-- create
+## lib method
 
+|name|description|type|note|
+|---|---|---|---|
+|create|create a instance|(id: string, syncKeys: string[]) => Instance||
+|get|get a instance by id|(id: string) => Instance\|undefined||
+
+### instance method
+
+
+|name|description|type|note|
+|---|---|---|---|
+|pull|get state from other pages|() => Promise<[AddData, RemoveData]>|not resolve if one page|
+|push|set state to other pages|() => Promise<void>|not resolve if one page|
+|subscribe|add a callback|(handle) => void|action when pull resolve|
+|unsubscribe|remove a callback|(handle) => void||
+|dispose|destroy instance|Function||
 
 ## License
 [MIT](./license)
